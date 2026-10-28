@@ -7,7 +7,9 @@ import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/collect/collect_layout.dart';
 import 'package:kazumi/modules/collect/collect_module.dart';
 import 'package:kazumi/modules/collect/collect_type.dart';
+import 'package:kazumi/modules/history/history_module.dart';
 import 'package:kazumi/pages/collect/collect_library_query.dart';
+import 'package:kazumi/pages/history/history_display.dart';
 
 part 'collect_library_card.dart';
 part 'collect_library_controls.dart';
@@ -31,7 +33,13 @@ class CollectLibraryView extends StatefulWidget {
     required this.canEdit,
     required this.layout,
     required this.onLayoutChanged,
+    this.latestHistory = const {},
+    this.onResume,
   });
+
+  /// Latest watch record per bangumi id, shown in the list layout.
+  final Map<int, History> latestHistory;
+  final ValueChanged<History>? onResume;
 
   final List<CollectedBangumi> entries;
   final bool showRating;
@@ -366,6 +374,8 @@ class _CollectLibraryViewState extends State<CollectLibraryView>
             showRating: widget.showRating,
             onOpen: () => widget.onOpen(entries[index].bangumiItem),
             onChangeType: _changeTypeFor(entries[index]),
+            history: widget.latestHistory[entries[index].bangumiItem.id],
+            onResume: widget.onResume,
           ),
         );
 

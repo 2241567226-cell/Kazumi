@@ -4,6 +4,7 @@ import 'package:kazumi/bean/widget/kazumi_menu.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/modules/collect/collect_type.dart';
 import 'package:kazumi/modules/history/history_module.dart';
+import 'package:kazumi/pages/history/history_display.dart';
 
 class HistoryRecordTile extends StatelessWidget {
   const HistoryRecordTile({
@@ -29,16 +30,7 @@ class HistoryRecordTile extends StatelessWidget {
   final bool editing;
   final bool busy;
 
-  String get _position {
-    final progress = history.progresses[history.lastWatchEpisode]?.progress;
-    if (progress == null || progress.inSeconds <= 0) return '';
-    final seconds = (progress.inSeconds % 60).toString().padLeft(2, '0');
-    final minutes = (progress.inMinutes % 60).toString().padLeft(2, '0');
-    final position = progress.inHours > 0
-        ? '${progress.inHours}:$minutes:$seconds'
-        : '${progress.inMinutes}:$seconds';
-    return '看到 $position';
-  }
+  String get _position => history.positionLabel;
 
   @override
   Widget build(BuildContext context) {

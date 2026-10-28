@@ -12,10 +12,16 @@ import 'package:kazumi/modules/bangumi/sync_priority.dart';
 import 'package:kazumi/modules/collect/collect_layout.dart';
 import 'package:kazumi/modules/collect/collect_sync_plan.dart';
 import 'package:kazumi/modules/collect/collect_type.dart';
+import 'package:kazumi/modules/history/history_module.dart';
 import 'package:kazumi/pages/collect/collect_controller.dart';
 import 'package:kazumi/pages/collect/collect_library_view.dart';
 import 'package:kazumi/pages/collect/collect_sync_dialog.dart';
+import 'package:kazumi/pages/history/history_controller.dart';
+import 'package:kazumi/services/player/history_playback_service.dart';
+import 'package:kazumi/services/plugin/rule_engine_models.dart'
+    show RuleCancelToken;
 import 'package:kazumi/services/storage/storage.dart';
+import 'package:kazumi/utils/device.dart';
 
 class CollectPage extends StatefulWidget {
   const CollectPage({
@@ -32,6 +38,9 @@ class CollectPage extends StatefulWidget {
 class _CollectPageState extends State<CollectPage> with KazumiDialogOwner {
   CollectController get collectController => widget.controller;
   bool get _syncDialogOpen => dialogs.isRunning;
+  final HistoryController _historyController = inject<HistoryController>();
+  final HistoryPlaybackService _playbackService =
+      inject<HistoryPlaybackService>();
   final Set<int> _pendingIds = {};
   late CollectLayout _layout;
 
@@ -61,6 +70,29 @@ class _CollectPageState extends State<CollectPage> with KazumiDialogOwner {
       GStorage.getSetting(SettingsKeys.defaultCollectLayout),
     );
     collectController.loadCollectibles();
+    _historyController.init();
+  }
+
+  /// Resume the last watched episode, same path as the history page.
+  Future<void> _resume(History history) async {
+    if (_syncDialogOpen || dialogs.isRunning) return;
+    await dialogs.run((task) async {
+      final cancelToken = RuleCancelToken();
+      final result = await task.loading(
+        message: '获取中',
+        barrierDismissible: isDesktop(),
+        onCancel: cancelToken.cancel,
+        action: () =>
+            _playbackService.open(history, cancelToken: cancelToken),
+      );
+      switch (result) {
+        case HistoryPlaybackReady(:final args):
+          task.withContext(
+              (context) => context.pushNamed('/video/', arguments: args));
+        case HistoryPlaybackUnavailable(:final reason):
+          KazumiDialog.showToast(message: reason);
+      }
+    }, errorMessage: '暂时无法继续播放，请稍后重试');
   }
 
   void _changeLayout(CollectLayout layout) {
@@ -137,16 +169,26 @@ class _CollectPageState extends State<CollectPage> with KazumiDialogOwner {
         top: false,
         bottom: false,
         child: Observer(
-          builder: (context) => CollectLibraryView(
-            entries: collectController.collectibles.toList(),
-            showRating: GStorage.getSetting(SettingsKeys.showRating),
-            layout: _layout,
-            onLayoutChanged: _changeLayout,
-            canEdit: (item) =>
-                !_syncDialogOpen && !_pendingIds.contains(item.id),
-            onOpen: (item) => context.pushNamed('/info/', arguments: item),
-            onChangeType: (item, type) => unawaited(_changeType(item, type)),
-          ),
+          builder: (context) {
+            // Histories are sorted newest first, so the first hit per
+            // bangumi is its latest watch record.
+            final latestHistory = <int, History>{};
+            for (final history in _historyController.histories) {
+              latestHistory.putIfAbsent(history.bangumiItem.id, () => history);
+            }
+            return CollectLibraryView(
+              entries: collectController.collectibles.toList(),
+              latestHistory: latestHistory,
+              onResume: (history) => unawaited(_resume(history)),
+              showRating: GStorage.getSetting(SettingsKeys.showRating),
+              layout: _layout,
+              onLayoutChanged: _changeLayout,
+              canEdit: (item) =>
+                  !_syncDialogOpen && !_pendingIds.contains(item.id),
+              onOpen: (item) => context.pushNamed('/info/', arguments: item),
+              onChangeType: (item, type) => unawaited(_changeType(item, type)),
+            );
+          },
         ),
       ),
     );

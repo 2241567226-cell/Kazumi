@@ -218,12 +218,16 @@ class _CollectListTile extends StatelessWidget {
     required this.showRating,
     required this.onOpen,
     required this.onChangeType,
+    this.history,
+    this.onResume,
   });
 
   final CollectedBangumi entry;
   final bool showRating;
   final VoidCallback onOpen;
   final ValueChanged<CollectType>? onChangeType;
+  final History? history;
+  final ValueChanged<History>? onResume;
 
   @override
   Widget build(BuildContext context) {
@@ -305,21 +309,90 @@ class _CollectListTile extends StatelessWidget {
                                         ),
                                       ),
                                     ),
+                                  if (history != null)
+                                    _CollectHistoryInfo(history: history!),
                                 ],
                               ),
                             ),
                           ),
                         ),
                       ),
-                      _CollectEntryMenu(
-                        entry: entry,
-                        onChanged: onChangeType,
-                        showStatusLabel: true,
+                      Wrap(
+                        spacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _CollectEntryMenu(
+                            entry: entry,
+                            onChanged: onChangeType,
+                            showStatusLabel: true,
+                          ),
+                          if (history != null && onResume != null)
+                            IconButton.filledTonal(
+                              tooltip: '继续播放',
+                              style: IconButton.styleFrom(
+                                minimumSize: const Size(48, 48),
+                                backgroundColor: colors.primaryContainer,
+                                foregroundColor: colors.onPrimaryContainer,
+                              ),
+                              onPressed: () => onResume!(history!),
+                              icon: const Icon(Icons.play_arrow_rounded),
+                            ),
+                        ],
                       ),
                     ],
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Last watched episode, position and source, as in the history page.
+class _CollectHistoryInfo extends StatelessWidget {
+  const _CollectHistoryInfo({required this.history});
+
+  final History history;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final position = history.positionLabel;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            history.episodeLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: colors.onSurfaceVariant),
+          ),
+          if (position.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                position,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: colors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              history.sourceLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: colors.onSurfaceVariant),
             ),
           ),
         ],
