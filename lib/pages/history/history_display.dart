@@ -25,4 +25,35 @@ extension HistoryDisplay on History {
             : '在线';
     return [kind, if (adapterName.isNotEmpty) adapterName].join(' · ');
   }
+
+  /// "22:44" without a prefix; empty when there is no progress.
+  String get positionText {
+    final label = positionLabel;
+    return label.startsWith('看到 ') ? label.substring(3) : label;
+  }
+
+  /// "第12集---22:44" (the time part is omitted when there is no progress).
+  String get watchedEpisodeLine {
+    final time = positionText;
+    return time.isEmpty
+        ? '第$lastWatchEpisode集'
+        : '第$lastWatchEpisode集---$time';
+  }
+
+  /// "在线---源名" / "本地---源名".
+  String get watchModeLine {
+    final kind =
+        HistoryEntryKind.normalize(entryKind) == HistoryEntryKind.offline
+            ? '本地'
+            : '在线';
+    return adapterName.isEmpty ? kind : '$kind---$adapterName';
+  }
+}
+
+/// "2026年1月番" from an air date string; empty when the date is unknown.
+String seasonLabelOf(String airDate) {
+  final date = DateTime.tryParse(airDate);
+  if (date == null) return '';
+  final month = ((date.month - 1) ~/ 3) * 3 + 1;
+  return '${date.year}年$month月番';
 }

@@ -18,6 +18,7 @@ class WebDav {
   static const String _historyChangesPath = '$_historyRootPath/changes';
   static const String _historySnapshotPath = '$_historyRootPath/snapshot.json';
   static const String _danmakuShieldPath = '$_syncRootPath/danmakuShield';
+  static const String _animeMemoPath = '$_syncRootPath/animeMemo';
 
   late String webDavURL;
   late String webDavUsername;
@@ -137,6 +138,47 @@ class WebDav {
         } catch (e) {
           KazumiLogger()
               .w('WebDav: failed to clean danmaku shield sync files', error: e);
+        }
+      }
+    });
+  }
+
+  /// Per-device note files, merged by the caller (newest edit wins).
+  Future<void> syncAnimeMemos({
+    required String deviceId,
+    required Future<String> Function(List<String> remoteFiles) merge,
+  }) {
+    return _runWebDavExclusive(() async {
+      if (!initialized) await _init();
+      await _ensureLocalTempDirectory();
+      await _ensureRemoteDirectory(_animeMemoPath);
+      final runDirectory =
+          await webDavLocalTempDirectory.createTemp('anime-memo-sync-');
+      try {
+        final remoteFiles = <String>[];
+        final entries = await client.readDir(_animeMemoPath);
+        var index = 0;
+        for (final entry in entries) {
+          final name = entry.name ?? '';
+          if (entry.isDir == true || !name.endsWith('.json')) continue;
+          final file = File('${runDirectory.path}/remote-${index++}.json');
+          await client.read2File('$_animeMemoPath/$name', file.path);
+          remoteFiles.add(await file.readAsString());
+        }
+        final upload = File('${runDirectory.path}/local.json');
+        await upload.writeAsString(await merge(remoteFiles), flush: true);
+        final destination = '$_animeMemoPath/$deviceId.json';
+        await _publishRemoteFile(
+          sourceFilePath: upload.path,
+          destinationPath: destination,
+          temporaryPath: '$destination.cache',
+        );
+      } finally {
+        try {
+          await runDirectory.delete(recursive: true);
+        } catch (e) {
+          KazumiLogger()
+              .w('WebDav: failed to clean anime memo sync files', error: e);
         }
       }
     });

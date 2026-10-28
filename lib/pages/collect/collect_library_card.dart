@@ -219,7 +219,6 @@ class _CollectListTile extends StatelessWidget {
     required this.onOpen,
     required this.onChangeType,
     this.history,
-    this.onResume,
   });
 
   final CollectedBangumi entry;
@@ -227,7 +226,6 @@ class _CollectListTile extends StatelessWidget {
   final VoidCallback onOpen;
   final ValueChanged<CollectType>? onChangeType;
   final History? history;
-  final ValueChanged<History>? onResume;
 
   @override
   Widget build(BuildContext context) {
@@ -235,9 +233,7 @@ class _CollectListTile extends StatelessWidget {
     final colors = theme.colorScheme;
     final item = entry.bangumiItem;
     final title = CollectLibraryQuery.titleOf(entry);
-    final airDate = DateTime.tryParse(item.airDate);
     final metadata = [
-      if (airDate != null) '${airDate.year} 年',
       if (showRating && item.ratingScore > 0)
         '${item.ratingScore.toStringAsFixed(1)} 分',
     ];
@@ -309,35 +305,15 @@ class _CollectListTile extends StatelessWidget {
                                         ),
                                       ),
                                     ),
-                                  if (history != null)
-                                    _CollectHistoryInfo(history: history!),
+                                  _CollectHistoryInfo(
+                                    seasonLabel: seasonLabelOf(item.airDate),
+                                    history: history,
+                                  ),
                                 ],
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      Wrap(
-                        spacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          _CollectEntryMenu(
-                            entry: entry,
-                            onChanged: onChangeType,
-                            showStatusLabel: true,
-                          ),
-                          if (history != null && onResume != null)
-                            IconButton.filledTonal(
-                              tooltip: '继续播放',
-                              style: IconButton.styleFrom(
-                                minimumSize: const Size(48, 48),
-                                backgroundColor: colors.primaryContainer,
-                                foregroundColor: colors.onPrimaryContainer,
-                              ),
-                              onPressed: () => onResume!(history!),
-                              icon: const Icon(Icons.play_arrow_rounded),
-                            ),
-                        ],
                       ),
                     ],
                   ),
@@ -351,52 +327,37 @@ class _CollectListTile extends StatelessWidget {
   }
 }
 
-/// Last watched episode, position and source, as in the history page.
+/// Four labelled rows: season, episode title, watched episode and source.
 class _CollectHistoryInfo extends StatelessWidget {
-  const _CollectHistoryInfo({required this.history});
+  const _CollectHistoryInfo({required this.seasonLabel, this.history});
 
-  final History history;
+  final String seasonLabel;
+  final History? history;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final position = history.positionLabel;
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            history.episodeLabel,
+    final style =
+        theme.textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant);
+    final h = history;
+    Widget row(String label, String value) => Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            '$label：$value',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: colors.onSurfaceVariant),
+            style: style,
           ),
-          if (position.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                position,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: colors.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              history.sourceLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: colors.onSurfaceVariant),
-            ),
-          ),
-        ],
-      ),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        row('番剧时间', seasonLabel),
+        row('剧集标题', h?.lastWatchEpisodeName ?? ''),
+        row('观看集数', h?.watchedEpisodeLine ?? ''),
+        row('观看方式', h?.watchModeLine ?? ''),
+      ],
     );
   }
 }

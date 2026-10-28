@@ -14,6 +14,11 @@ import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/widget/collect_button.dart';
 import 'package:kazumi/bean/widget/embedded_native_control_area.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
+import 'package:kazumi/modules/history/history_module.dart';
+import 'package:kazumi/pages/history/history_controller.dart';
+import 'package:kazumi/services/player/history_playback_service.dart';
+import 'package:kazumi/services/plugin/rule_engine_models.dart'
+    show RuleCancelToken;
 import 'package:kazumi/pages/info/info_actions_menu.dart';
 import 'package:kazumi/pages/info/info_controller.dart';
 import 'package:kazumi/pages/info/info_tabview.dart';
@@ -42,7 +47,7 @@ class InfoPage extends StatefulWidget {
 }
 
 class _InfoPageState extends State<InfoPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, KazumiDialogOwner {
   static const List<String> _infoTabs = <String>[
     '概览',
     '吐槽',
@@ -54,6 +59,9 @@ class _InfoPageState extends State<InfoPage>
       Duration(milliseconds: 600);
 
   InfoController get infoController => widget.infoController;
+  final HistoryController _historyController = inject<HistoryController>();
+  final HistoryPlaybackService _playbackService =
+      inject<HistoryPlaybackService>();
   late final TabController infoTabController;
   late final bool showRating;
 
@@ -207,6 +215,7 @@ class _InfoPageState extends State<InfoPage>
   @override
   void initState() {
     super.initState();
+    _historyController.init();
     infoController.bangumiItem = widget.inputBangumiItem;
     infoController.characterList.clear();
     infoController.clearComments();
@@ -298,6 +307,40 @@ class _InfoPageState extends State<InfoPage>
         });
       }
     }
+  }
+
+  /// Most recently watched history of this anime (any source), if any.
+  History? get _latestHistory {
+    History? latest;
+    for (final history in _historyController.histories) {
+      if (history.bangumiItem.id != infoController.bangumiItem.id) continue;
+      if (latest == null || history.lastWatchTime.isAfter(latest.lastWatchTime)) {
+        latest = history;
+      }
+    }
+    return latest;
+  }
+
+  /// Same path as the history page's resume button.
+  Future<void> _continueWatching(History history) async {
+    if (dialogs.isRunning) return;
+    await dialogs.run((task) async {
+      final cancelToken = RuleCancelToken();
+      final result = await task.loading(
+        message: '获取中',
+        barrierDismissible: isDesktop(),
+        onCancel: cancelToken.cancel,
+        action: () =>
+            _playbackService.open(history, cancelToken: cancelToken),
+      );
+      switch (result) {
+        case HistoryPlaybackReady(:final args):
+          task.withContext(
+              (context) => context.pushNamed('/video/', arguments: args));
+        case HistoryPlaybackUnavailable(:final reason):
+          KazumiDialog.showToast(message: reason);
+      }
+    }, errorMessage: '暂时无法继续播放，请稍后重试');
   }
 
   void _startWatching() {
@@ -468,12 +511,33 @@ class _InfoPageState extends State<InfoPage>
           );
         }),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        tooltip: '开始观看',
-        onPressed: _startWatching,
-        label: const Text('开始观看'),
-        icon: const Icon(Icons.play_arrow_rounded),
-      ),
+      floatingActionButton: Observer(builder: (context) {
+        // Track the observable list; _latestHistory reads it.
+        _historyController.histories.length;
+        final history = _latestHistory;
+        final startButton = FloatingActionButton.extended(
+          heroTag: 'info-start-watching',
+          tooltip: '开始观看',
+          onPressed: _startWatching,
+          label: const Text('开始观看'),
+          icon: const Icon(Icons.play_arrow_rounded),
+        );
+        if (history == null) return startButton;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FloatingActionButton.extended(
+              heroTag: 'info-continue-watching',
+              tooltip: '继续观看',
+              onPressed: () => _continueWatching(history),
+              label: const Text('继续观看'),
+              icon: const Icon(Icons.history_rounded),
+            ),
+            const SizedBox(width: 12),
+            startButton,
+          ],
+        );
+      }),
     );
   }
 }

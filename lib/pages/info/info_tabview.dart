@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
+import 'package:kazumi/pages/info/anime_memo_section.dart';
 import 'package:kazumi/bean/widget/error_widget.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/pages/info/info_comments_view.dart';
@@ -176,6 +177,9 @@ class _InfoTabViewState extends State<InfoTabView> {
                   );
                 }).toList(),
               ),
+              const SizedBox(height: 16),
+              AnimeMemoSection(bangumiId: widget.bangumiItem.id),
+              const SizedBox(height: 72),
             ],
           ),
         ),
