@@ -1,0 +1,56 @@
+name: "Android APK"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'static/**'
+
+jobs:
+  build-android:
+    name: "Build Android APK"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2.16.0
+        id: flutter-action
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Remove build id
+        run: |
+          sed -i -e 's/-Wl,/-Wl,--build-id=none,/' ${{ steps.flutter-action.outputs.PUB-CACHE-PATH }}/hosted/pub.dev/jni-*/src/CMakeLists.txt || true
+
+      - name: Build APK
+        env:
+          DANDANAPI_APPID: ${{ secrets.DANDANAPI_APPID }}
+          DANDANAPI_KEY: ${{ secrets.DANDANAPI_KEY }}
+          KAZUMI_APPID: ${{ secrets.KAZUMI_APPID }}
+          KAZUMI_KEY: ${{ secrets.KAZUMI_KEY }}
+        run: >-
+          flutter build apk --release --split-per-abi
+          --dart-define=DANDANAPI_APPID=$DANDANAPI_APPID
+          --dart-define=DANDANAPI_KEY=$DANDANAPI_KEY
+          --dart-define=KAZUMI_APPID=$KAZUMI_APPID
+          --dart-define=KAZUMI_KEY=$KAZUMI_KEY
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kazumi-android-apk
+          path: build/app/outputs/flutter-apk/app-*-release.apk
