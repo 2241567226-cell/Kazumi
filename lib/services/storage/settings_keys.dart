@@ -161,6 +161,18 @@ class SettingsKeys {
     0,
     group: SettingGroup.danmaku,
   );
+  // 用户在应用内填写的弹弹play开放平台凭证（优先于打包时注入的值）。
+  // 放在 misc 组，避免被“恢复默认弹幕设置”清空。
+  static const dandanAppId = SettingKey<String>(
+    'dandanAppId',
+    '',
+    group: SettingGroup.misc,
+  );
+  static const dandanAppSecret = SettingKey<String>(
+    'dandanAppSecret',
+    '',
+    group: SettingGroup.misc,
+  );
   static const danmakuArea = SettingKey<double>(
     _SettingBoxKey.danmakuArea,
     1.0,
@@ -600,6 +612,8 @@ class SettingsKeys {
     danmakuMassive,
     danmakuDeduplication,
     danmakuChConvert,
+    dandanAppId,
+    dandanAppSecret,
     danmakuArea,
     danmakuColor,
     danmakuDuration,

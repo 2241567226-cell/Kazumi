@@ -4,6 +4,7 @@ import 'package:kazumi/request/core/network_error_mapper.dart';
 import 'package:kazumi/utils/dandan_credentials.dart';
 import 'package:kazumi/utils/http_headers.dart';
 import 'package:kazumi/utils/crypto.dart';
+import 'package:kazumi/services/logging/logger.dart';
 
 class DanmakuClient {
   DanmakuClient._();
@@ -16,13 +17,17 @@ class DanmakuClient {
     Map<String, dynamic> headers = const {},
     CancelToken? cancelToken,
   }) async {
+    if (!hasDandanCredentials()) {
+      KazumiLogger().w(
+          'Danmaku: 未配置弹弹play AppId/AppSecret，请在 设置 -> 弹幕设置 中填写');
+    }
     final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final uri = Uri.parse(url);
     final requestHeaders = <String, dynamic>{
       'user-agent': getRandomUA(),
       'referer': '',
       'X-Auth': 1,
-      'X-AppId': dandanCredentials['id'],
+      'X-AppId': resolveDandanCredentials()['id'],
       'X-Timestamp': timestamp,
       'X-Signature': generateDandanSignature(uri.path, timestamp),
       ...headers,
