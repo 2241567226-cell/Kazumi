@@ -42,8 +42,7 @@ jobs:
           DANDANAPI_KEY: ${{ secrets.DANDANAPI_KEY }}
         run: |
           if [ -z "$DANDANAPI_APPID" ] || [ -z "$DANDANAPI_KEY" ]; then
-            echo "::error::缺少 DANDANAPI_APPID / DANDANAPI_KEY，请在仓库 Settings -> Secrets and variables -> Actions 中添加，否则弹幕无法加载"
-            exit 1
+            echo "::warning::未配置 DANDANAPI_APPID / DANDANAPI_KEY，打包可继续，但需要在软件 设置->弹幕设置 中填写凭证后才能加载弹幕"
           fi
 
       - name: Build APK
