@@ -25,6 +25,7 @@ import 'package:kazumi/services/plugin/captcha_verification_service.dart';
 import 'package:kazumi/services/plugin/plugin_search_service.dart';
 import 'package:kazumi/services/plugin/rule_engine_models.dart'
     show RuleCancelToken;
+import 'package:kazumi/services/video_source/source_resolution_probe.dart';
 import 'package:kazumi/utils/device.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -45,6 +46,7 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
   final CollectController _collectController = inject<CollectController>();
   final PluginsController _pluginsController = inject<PluginsController>();
   final Map<String, String> _sourceKeywords = {};
+  final SourceResolutionProbe _resolutionProbe = SourceResolutionProbe();
 
   late final String _keyword;
   late final PluginSearchService _searchService;
@@ -69,6 +71,7 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
   @override
   void dispose() {
     _searchService.cancel();
+    _resolutionProbe.dispose();
     _captchaFlow.dispose();
     super.dispose();
   }
@@ -175,7 +178,12 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
       );
 
   @override
-  Widget build(BuildContext context) => Observer(
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: _resolutionProbe,
+        builder: (context, _) => _buildObserved(context),
+      );
+
+  Widget _buildObserved(BuildContext context) => Observer(
         builder: (context) {
           // Snapshot observable values here; lazy list builders are not tracked.
           final groupsByName = {
@@ -201,7 +209,22 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
             }
             if (group.hasResults) firstResultSource ??= group.name;
           }
+          // Probe after the frame: probing notifies listeners and must not
+          // run while the tree is building.
+          final probeTargets = <(Plugin, SearchItem)>[
+            for (final group in groupsByName.values)
+              if (group.hasResults)
+                for (final result in group.results)
+                  (_pluginFor(group.name), result),
+          ];
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            for (final (plugin, result) in probeTargets) {
+              _resolutionProbe.request(plugin, result);
+            }
+          });
           return _SourceSheetView(
+            resolutionOf: _resolutionProbe.stateOf,
             keyword: _keyword,
             groups: groupsByName.values.toList(),
             firstResultSource: firstResultSource,

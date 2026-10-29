@@ -4,7 +4,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_modular/flutter_modular.dart';
-import 'package:window_manager/window_manager.dart';
 
 import 'package:kazumi/bean/appbar/drag_to_move_bar.dart' as dtb;
 import 'package:kazumi/bean/card/bangumi_info_card.dart';
@@ -13,6 +12,7 @@ import 'package:kazumi/bean/dialog/adaptive_bottom_sheet.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/widget/collect_button.dart';
 import 'package:kazumi/bean/widget/embedded_native_control_area.dart';
+import 'package:kazumi/bean/widget/window_control_buttons.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/history/history_module.dart';
 import 'package:kazumi/pages/history/history_controller.dart';
@@ -420,7 +420,7 @@ class _InfoPageState extends State<InfoPage>
                     ),
                   ),
                   if (isDesktop() && !showWindowButton)
-                    CloseButton(onPressed: () => windowManager.close()),
+                    const WindowControlButtons(),
                   SizedBox(width: 8),
                 ],
                 toolbarHeight: kToolbarHeight + topOffset,

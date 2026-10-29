@@ -31,6 +31,7 @@ enum _SourceDisplay { preview, expanded, collapsed }
 
 class _SourceSheetView extends StatefulWidget {
   const _SourceSheetView({
+    required this.resolutionOf,
     required this.keyword,
     required this.groups,
     required this.firstResultSource,
@@ -43,6 +44,8 @@ class _SourceSheetView extends StatefulWidget {
     required this.onClose,
   });
 
+  final SourceResolutionState? Function(String sourceName, SearchItem item)
+      resolutionOf;
   final String keyword;
   final List<_SourceSearchGroup> groups;
   final String? firstResultSource;
@@ -402,12 +405,55 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
                         color: theme.colorScheme.onSurface,
                       )),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
+                _buildResolutionBadge(group.name, result),
+                const SizedBox(width: 12),
                 Icon(Icons.play_arrow_rounded,
                     color: theme.colorScheme.primary),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResolutionBadge(String sourceName, SearchItem item) {
+    final state = widget.resolutionOf(sourceName, item);
+    if (state == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final style = theme.textTheme.labelSmall;
+
+    if (state.isBusy) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(strokeWidth: 1.5),
+          ),
+          const SizedBox(width: 6),
+          Text('分辨率检测中',
+              style: style?.copyWith(color: colors.onSurfaceVariant)),
+        ],
+      );
+    }
+
+    final label = state.label;
+    final known = label != null;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: known ? colors.secondaryContainer : colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        known ? label : '分辨率未知',
+        style: style?.copyWith(
+          color: known ? colors.onSecondaryContainer : colors.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
