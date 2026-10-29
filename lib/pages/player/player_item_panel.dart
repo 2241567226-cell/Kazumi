@@ -19,6 +19,7 @@ import 'package:kazumi/pages/video/video_controller.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/pages/player/player_controller.dart';
 import 'package:flutter/services.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:kazumi/services/player/remote.dart';
 import 'package:kazumi/bean/appbar/drag_to_move_bar.dart' as dtb;
 import 'package:kazumi/pages/settings/danmaku/danmaku_settings_sheet.dart';
@@ -975,6 +976,24 @@ class _PlayerItemPanelState extends State<PlayerItemPanel> {
                   if (!compact) _syncPlayMenuItem,
                 ],
               ),
+              if (isDesktop() && !videoPageController.isPip)
+                IconButton(
+                  onPressed: () async {
+                    try {
+                      // 全屏状态下先退出全屏，否则最小化可能无效
+                      if (await windowManager.isFullScreen()) {
+                        widget.handleFullscreen();
+                        await Future.delayed(const Duration(milliseconds: 300));
+                      }
+                      await windowManager.minimize();
+                    } catch (_) {}
+                  },
+                  tooltip: '最小化',
+                  icon: const Icon(
+                    Icons.remove_rounded,
+                    color: Colors.white,
+                  ),
+                ),
             ],
           ),
         ),
