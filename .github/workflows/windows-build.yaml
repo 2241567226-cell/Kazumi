@@ -17,7 +17,29 @@ jobs:
           channel: stable
           flutter-version-file: pubspec.yaml
       - run: flutter pub get
-      - run: flutter build windows
+      - name: Check DanDanPlay secrets
+        shell: pwsh
+        env:
+          DANDANAPI_APPID: ${{ secrets.DANDANAPI_APPID }}
+          DANDANAPI_KEY: ${{ secrets.DANDANAPI_KEY }}
+        run: |
+          if ([string]::IsNullOrEmpty($env:DANDANAPI_APPID) -or [string]::IsNullOrEmpty($env:DANDANAPI_KEY)) {
+            Write-Error "缺少 DANDANAPI_APPID / DANDANAPI_KEY，请在仓库 Settings -> Secrets and variables -> Actions 中添加，否则弹幕无法加载"
+            exit 1
+          }
+      - name: Build Windows
+        shell: pwsh
+        env:
+          DANDANAPI_APPID: ${{ secrets.DANDANAPI_APPID }}
+          DANDANAPI_KEY: ${{ secrets.DANDANAPI_KEY }}
+          KAZUMI_APPID: ${{ secrets.KAZUMI_APPID }}
+          KAZUMI_KEY: ${{ secrets.KAZUMI_KEY }}
+        run: >-
+          flutter build windows
+          --dart-define=DANDANAPI_APPID=$env:DANDANAPI_APPID
+          --dart-define=DANDANAPI_KEY=$env:DANDANAPI_KEY
+          --dart-define=KAZUMI_APPID=$env:KAZUMI_APPID
+          --dart-define=KAZUMI_KEY=$env:KAZUMI_KEY
       - run: Compress-Archive build/windows/x64/runner/Release/* Kazumi_windows.zip
       - uses: actions/upload-artifact@v4
         with:

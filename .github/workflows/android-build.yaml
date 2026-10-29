@@ -36,6 +36,16 @@ jobs:
         run: |
           sed -i -e 's/-Wl,/-Wl,--build-id=none,/' ${{ steps.flutter-action.outputs.PUB-CACHE-PATH }}/hosted/pub.dev/jni-*/src/CMakeLists.txt || true
 
+      - name: Check DanDanPlay secrets
+        env:
+          DANDANAPI_APPID: ${{ secrets.DANDANAPI_APPID }}
+          DANDANAPI_KEY: ${{ secrets.DANDANAPI_KEY }}
+        run: |
+          if [ -z "$DANDANAPI_APPID" ] || [ -z "$DANDANAPI_KEY" ]; then
+            echo "::error::缺少 DANDANAPI_APPID / DANDANAPI_KEY，请在仓库 Settings -> Secrets and variables -> Actions 中添加，否则弹幕无法加载"
+            exit 1
+          fi
+
       - name: Build APK
         env:
           DANDANAPI_APPID: ${{ secrets.DANDANAPI_APPID }}
