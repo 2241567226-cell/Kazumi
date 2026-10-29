@@ -8,7 +8,10 @@ import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/video_source/webview_video_source_service.dart';
 import 'package:kazumi/utils/device.dart';
+import 'package:kazumi/services/video_source/video_header_probe.dart';
+import 'package:kazumi/services/video_source/video_source_format.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
 enum SourceResolutionStatus { queued, probing, done, unknown }
 
@@ -137,12 +140,20 @@ class SourceResolutionProbe extends ChangeNotifier {
 
     final headers = plugin.buildHttpHeaders();
     final url = source.url;
-    final looksLikeHls = url.toLowerCase().contains('.m3u8');
-    if (looksLikeHls) {
+    final isHls = source.format == VideoSourceFormat.hls ||
+        url.toLowerCase().contains('.m3u8');
+    if (isHls) {
       final fromPlaylist = await _resolutionFromHls(url, headers);
       if (fromPlaylist != null) return fromPlaylist;
+    } else {
+      // 直链文件（mp4 / mkv 等）：只读文件头，通常不到 1 秒。
+      final size = await VideoHeaderProbe(headers).probe(url);
+      if (size != null && !_disposed) {
+        return formatResolution(size.$1, size.$2);
+      }
     }
-    return _resolutionFromPlayer(url, headers);
+    if (_disposed) return null;
+    return _resolutionFromPlayer(url, headers, hls: isHls);
   }
 
   Future<String?> _resolutionFromHls(
@@ -175,13 +186,21 @@ class SourceResolutionProbe extends ChangeNotifier {
     return null;
   }
 
-  Future<String?> _resolutionFromPlayer(
-      String url, Map<String, String> headers) async {
+  Future<String?> _resolutionFromPlayer(String url, Map<String, String> headers,
+      {bool hls = false}) async {
     Player? player;
     StreamSubscription? widthSub;
     StreamSubscription? heightSub;
+    StreamSubscription? videoParamsSub;
     try {
       player = Player();
+      // 没有 VideoController 时 media_kit 不会解码视频，拿不到宽高；
+      // 这里创建一个不显示的控制器，让播放器能读到视频参数。
+      VideoController(player);
+      if (hls) {
+        await (player.platform as NativePlayer)
+            .setProperty('demuxer-lavf-format', 'hls');
+      }
       int w = 0, h = 0;
       final done = Completer<void>();
       void check() {
@@ -196,14 +215,22 @@ class SourceResolutionProbe extends ChangeNotifier {
         h = v ?? 0;
         check();
       });
+      videoParamsSub = player.stream.videoParams.listen((v) {
+        if ((v.w ?? 0) > 0 && (v.h ?? 0) > 0) {
+          w = v.w!;
+          h = v.h!;
+          check();
+        }
+      });
       await player.open(Media(url, httpHeaders: headers), play: false);
-      await done.future.timeout(const Duration(seconds: 6));
+      await done.future.timeout(const Duration(seconds: 8));
       return formatResolution(w, h);
     } catch (_) {
       return null;
     } finally {
       await widthSub?.cancel();
       await heightSub?.cancel();
+      await videoParamsSub?.cancel();
       try {
         await player?.dispose();
       } catch (_) {}
