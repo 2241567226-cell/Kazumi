@@ -328,12 +328,18 @@ class BangumiApi {
     );
 
     try {
-      final jsonData = await _client.post(
-        ApiEndpoints.formatUrl(
-            ApiEndpoints.bangumiAPIDomain + ApiEndpoints.bangumiRankSearch,
-            [limit, offset]),
-        data: params,
-      );
+      final searchUrl = ApiEndpoints.formatUrl(
+          ApiEndpoints.bangumiAPIDomain + ApiEndpoints.bangumiRankSearch,
+          [limit, offset]);
+      dynamic jsonData;
+      try {
+        jsonData = await _client.post(searchUrl, data: params);
+      } catch (e) {
+        // 镜像不可用 / 签名被拒时，回退到官方接口再试一次。
+        KazumiLogger().w('Network: search failed, retry direct', error: e);
+        jsonData =
+            await _client.post(searchUrl, data: params, bypassMirror: true);
+      }
       final jsonList = jsonData['data'];
       for (dynamic jsonItem in jsonList) {
         if (jsonItem is Map<String, dynamic>) {

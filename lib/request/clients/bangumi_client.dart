@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:kazumi/request/config/api_endpoints.dart';
+import 'package:kazumi/request/core/acceleration_interceptors.dart'
+    show kBypassBangumiMirror;
 import 'package:kazumi/request/core/dio_factory.dart';
 import 'package:kazumi/request/core/network_error_mapper.dart';
 import 'package:kazumi/services/network/bangumi_acceleration.dart';
@@ -14,6 +16,12 @@ class BangumiClient {
   BangumiClient._();
 
   static final BangumiClient instance = BangumiClient._();
+
+  /// 打包时是否注入了镜像签名密钥（--dart-define=KAZUMI_APPID / KAZUMI_KEY）。
+  /// 自行打包通常没有，此时镜像的受保护接口（搜索）必然 401/403。
+  static bool get hasMirrorCredentials =>
+      (bangumiMirrorCredentials['id'] ?? '').isNotEmpty &&
+      (bangumiMirrorCredentials['value'] ?? '').isNotEmpty;
 
   Future<dynamic> get(
     String url, {
@@ -48,6 +56,7 @@ class BangumiClient {
     Map<String, dynamic>? queryParameters,
     bool requiresAuth = false,
     CancelToken? cancelToken,
+    bool bypassMirror = false,
   }) async {
     try {
       final response = await DioFactory.bangumiDio.post(
@@ -61,6 +70,7 @@ class BangumiClient {
             method: 'POST',
             data: data,
           ),
+          extra: {if (bypassMirror) kBypassBangumiMirror: true},
         ),
         cancelToken: cancelToken,
       );
@@ -88,7 +98,8 @@ class BangumiClient {
     if ((requiresAuth || bangumiSyncEnable) && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
-    if (_shouldSignProtectedMirrorRequest(url, method)) {
+    if (_shouldSignProtectedMirrorRequest(url, method) &&
+        BangumiClient.hasMirrorCredentials) {
       final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
       final body = data == null ? '' : jsonEncode(data);
       headers['X-AppId'] = bangumiMirrorCredentials['id'];

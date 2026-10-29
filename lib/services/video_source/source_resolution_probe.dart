@@ -7,6 +7,7 @@ import 'package:kazumi/modules/search/plugin_search_module.dart';
 import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/video_source/webview_video_source_service.dart';
+import 'package:kazumi/utils/device.dart';
 import 'package:media_kit/media_kit.dart';
 
 enum SourceResolutionStatus { queued, probing, done, unknown }
@@ -34,10 +35,17 @@ class SourceResolutionState {
 class SourceResolutionProbe extends ChangeNotifier {
   static final Map<String, SourceResolutionState> _cache = {};
 
+  /// 单个条目的探测总时限。超时即标记为“分辨率未知”，不再卡住整个队列。
+  static const Duration _jobTimeout = Duration(seconds: 20);
+
+  /// 并发探测数（每个并发位各自持有一个 WebView）。
+  static final int _maxWorkers = isDesktop() ? 3 : 2;
+
   final Queue<_ProbeJob> _queue = Queue<_ProbeJob>();
   final Set<String> _enqueued = <String>{};
-  WebViewVideoSourceService? _service;
-  bool _running = false;
+  final List<WebViewVideoSourceService?> _services =
+      List<WebViewVideoSourceService?>.filled(_maxWorkers, null);
+  final List<bool> _slotBusy = List<bool>.filled(_maxWorkers, false);
   bool _disposed = false;
 
   static String keyOf(String pluginName, SearchItem item) =>
@@ -64,16 +72,27 @@ class SourceResolutionProbe extends ChangeNotifier {
     _pump();
   }
 
-  Future<void> _pump() async {
-    if (_running) return;
-    _running = true;
+  void _pump() {
+    for (var slot = 0; slot < _maxWorkers; slot++) {
+      if (_queue.isEmpty || _disposed) return;
+      if (_slotBusy[slot]) continue;
+      _slotBusy[slot] = true;
+      unawaited(_worker(slot));
+    }
+  }
+
+  Future<void> _worker(int slot) async {
     try {
       while (_queue.isNotEmpty && !_disposed) {
         final job = _queue.removeFirst();
         _set(job.key, const SourceResolutionState(SourceResolutionStatus.probing));
         String? label;
         try {
-          label = await _probe(job.plugin, job.item);
+          label = await _probe(slot, job.plugin, job.item).timeout(_jobTimeout);
+        } on TimeoutException {
+          // 释放该并发位的 WebView，避免卡死后续任务。
+          _services[slot]?.cancel();
+          KazumiLogger().w('SourceResolutionProbe: probe timeout');
         } catch (e) {
           KazumiLogger().w('SourceResolutionProbe: probe failed', error: e);
         }
@@ -86,7 +105,7 @@ class SourceResolutionProbe extends ChangeNotifier {
         );
       }
     } finally {
-      _running = false;
+      _slotBusy[slot] = false;
     }
   }
 
@@ -95,8 +114,10 @@ class SourceResolutionProbe extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  Future<String?> _probe(Plugin plugin, SearchItem item) async {
-    final roads = await plugin.queryChapterRoads(item.src);
+  Future<String?> _probe(int slot, Plugin plugin, SearchItem item) async {
+    final roads = await plugin
+        .queryChapterRoads(item.src)
+        .timeout(const Duration(seconds: 8));
     String? episode;
     for (final road in roads) {
       if (road.data.isNotEmpty) {
@@ -106,11 +127,11 @@ class SourceResolutionProbe extends ChangeNotifier {
     }
     if (episode == null || _disposed) return null;
 
-    _service ??= WebViewVideoSourceService();
-    final source = await _service!.resolve(
+    final service = _services[slot] ??= WebViewVideoSourceService();
+    final source = await service.resolve(
       plugin.buildFullUrl(episode),
       useLegacyParser: plugin.useLegacyParser,
-      timeout: const Duration(seconds: 12),
+      timeout: const Duration(seconds: 10),
     );
     if (_disposed) return null;
 
@@ -176,7 +197,7 @@ class SourceResolutionProbe extends ChangeNotifier {
         check();
       });
       await player.open(Media(url, httpHeaders: headers), play: false);
-      await done.future.timeout(const Duration(seconds: 10));
+      await done.future.timeout(const Duration(seconds: 6));
       return formatResolution(w, h);
     } catch (_) {
       return null;
@@ -234,11 +255,13 @@ class SourceResolutionProbe extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _queue.clear();
-    _service?.cancel();
-    final service = _service;
-    _service = null;
-    if (service != null) {
-      unawaited(service.dispose());
+    for (var i = 0; i < _services.length; i++) {
+      final service = _services[i];
+      _services[i] = null;
+      if (service != null) {
+        service.cancel();
+        unawaited(service.dispose());
+      }
     }
     super.dispose();
   }

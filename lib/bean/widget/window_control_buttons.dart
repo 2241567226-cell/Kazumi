@@ -69,7 +69,7 @@ class _WindowControlButtonsState extends State<WindowControlButtons>
         IconButton(
           tooltip: '最小化',
           onPressed: () => windowManager.minimize(),
-          icon: const Icon(Icons.minimize_rounded),
+          icon: const _MinimizeGlyph(),
         ),
         IconButton(
           tooltip: _maximized ? '还原' : '最大化',
@@ -85,6 +85,34 @@ class _WindowControlButtonsState extends State<WindowControlButtons>
           icon: const Icon(Icons.close_rounded),
         ),
       ],
+    );
+  }
+}
+
+/// 自绘的“最小化”横线。
+///
+/// Material 的 `minimize_rounded` 图标横线贴在图标框底部，和 □ / × 并排时
+/// 视觉上偏下。这里用一条垂直居中的横线代替，颜色跟随 IconButton。
+class _MinimizeGlyph extends StatelessWidget {
+  const _MinimizeGlyph();
+
+  @override
+  Widget build(BuildContext context) {
+    final color = IconTheme.of(context).color ??
+        Theme.of(context).colorScheme.onSurfaceVariant;
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: Center(
+        child: Container(
+          width: 14,
+          height: 2,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(1),
+          ),
+        ),
+      ),
     );
   }
 }
