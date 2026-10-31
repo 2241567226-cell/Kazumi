@@ -1,4 +1,5 @@
 import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/request/clients/bangumi_client.dart';
 import 'package:kazumi/request/core/network_exception.dart';
@@ -274,6 +275,7 @@ class BangumiApi {
     SearchIntRange? rankRange,
     SearchDoubleRange? scoreRange,
     List<int> weekdays = const [],
+    bool allTypes = false,
   }) {
     final rankFilter = rankRange?.isValid == true
         ? _buildNumberFilter<int>(rankRange!.min, rankRange.max)
@@ -282,7 +284,8 @@ class BangumiApi {
             : [">=0", "<=99999"];
 
     final filter = <String, dynamic>{
-      "type": [2],
+      // 默认只搜动画(type 2)；开启"搜索全部类型"后不传 type，不做限制
+      if (!allTypes) "type": [2],
       "tag": tags,
       "rank": rankFilter,
       "nsfw": false
@@ -325,6 +328,7 @@ class BangumiApi {
       rankRange: rankRange,
       scoreRange: scoreRange,
       weekdays: weekdays,
+      allTypes: GStorage.getSetting(SettingsKeys.searchAllTypes),
     );
 
     try {

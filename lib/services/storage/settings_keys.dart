@@ -58,6 +58,12 @@ class SettingsKeys {
     true,
     group: SettingGroup.misc,
   );
+  // 规则管理中的开关：关闭时搜索只返回动画，开启后不限制 Bangumi 条目类型
+  static const searchAllTypes = SettingKey<bool>(
+    'searchAllTypes',
+    false,
+    group: SettingGroup.misc,
+  );
   static const autoUpdate = SettingKey<bool>(
     _SettingBoxKey.autoUpdate,
     true,
@@ -592,6 +598,7 @@ class SettingsKeys {
     hAenable,
     hardwareDecoder,
     searchEnhanceEnable,
+    searchAllTypes,
     autoUpdate,
     checkPluginUpdateOnStartup,
     alwaysOntop,

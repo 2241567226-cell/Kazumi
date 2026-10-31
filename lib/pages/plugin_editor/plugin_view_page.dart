@@ -21,6 +21,7 @@ import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/plugin/plugin_import_parser.dart';
+import 'package:kazumi/services/storage/storage.dart';
 
 class PluginViewPage extends StatefulWidget {
   const PluginViewPage({super.key, required this.controller});
@@ -40,6 +41,7 @@ class _PluginViewPageState extends State<PluginViewPage> {
   bool _updating = false;
   bool _deleting = false;
   bool _catalogFailed = false;
+  bool _searchAllTypes = GStorage.getSetting(SettingsKeys.searchAllTypes);
 
   @override
   void initState() {
@@ -274,7 +276,21 @@ class _PluginViewPageState extends State<PluginViewPage> {
                                 label: const Text('规则仓库')),
                           ],
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 12),
+                        SwitchListTile(
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 4),
+                          secondary: const Icon(Icons.travel_explore_rounded),
+                          title: const Text('搜索全部类型'),
+                          subtitle: const Text('关闭时只搜索动漫；开启后规则中配置的其他内容（美剧、日剧等）也可以搜索'),
+                          value: _searchAllTypes,
+                          onChanged: (value) {
+                            setState(() => _searchAllTypes = value);
+                            GStorage.putSetting(
+                                SettingsKeys.searchAllTypes, value);
+                          },
+                        ),
+                        const SizedBox(height: 8),
                         TextField(
                           controller: _search,
                           onChanged: (_) => setState(() {}),
