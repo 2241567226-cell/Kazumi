@@ -50,6 +50,14 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
       _activeLongPressKeys =
       <LogicalKeyboardKey, PlayerLongPressShortcutActions>{};
 
+  // 单击 Ctrl（按下后未配合其他按键就松开）时开关弹幕。
+  // 若按住 Ctrl 期间按了其他键（如 Ctrl+F），则视为组合键，不触发。
+  bool _ctrlTapCandidate = false;
+
+  static bool _isCtrlKey(LogicalKeyboardKey key) =>
+      key == LogicalKeyboardKey.controlLeft ||
+      key == LogicalKeyboardKey.controlRight;
+
   @override
   void initState() {
     super.initState();
@@ -83,6 +91,24 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
   }
 
   KeyEventResult _handleKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) {
+      if (_isCtrlKey(event.logicalKey)) {
+        _ctrlTapCandidate = _shouldHandleShortcut();
+      } else {
+        _ctrlTapCandidate = false;
+      }
+    } else if (event is KeyUpEvent && _isCtrlKey(event.logicalKey)) {
+      final shouldToggle = _ctrlTapCandidate && _shouldHandleShortcut();
+      _ctrlTapCandidate = false;
+      if (shouldToggle) {
+        final toggleDanmaku = widget.actions['toggledanmaku'];
+        if (toggleDanmaku != null) {
+          _invokeAction(toggleDanmaku);
+          return KeyEventResult.handled;
+        }
+      }
+    }
+
     if (event is KeyUpEvent) {
       final longPressActions = _activeLongPressKeys.remove(event.logicalKey);
       if (longPressActions != null) {
